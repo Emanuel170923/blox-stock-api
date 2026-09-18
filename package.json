@@ -1,0 +1,13 @@
+{
+  "name": "blox-stock-api",
+  "version": "1.0.0",
+  "description": "API para Blox Fruits Stock",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0"
+  }
+}
