@@ -13,10 +13,10 @@ const PARSE_STOCK_URL =
   "https://api.parse.bot/scraper/78cf8155-3819-45d0-b799-92f840a94827/get_stock";
 
 const PARSE_FRUITS_URL =
-  "https://api.parse.bot/scraper/78cf8155-3819-45d0-b799-92f840a94827/get_fruits?rarity=Mythical";
+  "https://api.parse.bot/scraper/78cf8155-3819-45d0-b799-92f840a94827/get_fruits";
 
 let cachedStock = null;
-let cachedMythicals = [];
+let fruitsInfo = [];
 let lastUpdate = null;
 
 async function updateStock() {
@@ -24,7 +24,7 @@ async function updateStock() {
     throw new Error("PARSE_API_KEY não configurada no Render");
   }
 
-  const [stockResponse, mythicalResponse] = await Promise.all([
+  const [stockResponse, fruitsResponse] = await Promise.all([
     fetch(PARSE_STOCK_URL, {
       headers: {
         "X-API-Key": PARSE_API_KEY
@@ -39,42 +39,61 @@ async function updateStock() {
   ]);
 
   if (!stockResponse.ok) {
-    throw new Error(`Erro no estoque: ${stockResponse.status}`);
+    throw new Error(
+      `Erro no estoque: ${stockResponse.status}`
+    );
   }
 
-  if (!mythicalResponse.ok) {
-    throw new Error(`Erro nas frutas Mythical: ${mythicalResponse.status}`);
+  if (!fruitsResponse.ok) {
+    throw new Error(
+      `Erro nas frutas: ${fruitsResponse.status}`
+    );
   }
 
   const stockData = await stockResponse.json();
-  const mythicalData = await mythicalResponse.json();
+  const fruitsData = await fruitsResponse.json();
 
   const stock = stockData.data || stockData;
-  const mythical = mythicalData.data || mythicalData;
+  const fruits = fruitsData.data || fruitsData;
 
-  cachedStock = {
-    normal: stock.normal || [],
-    mirage: stock.mirage || [],
-    previous_normal: stock.previous_normal || [],
-    previous_mirage: stock.previous_mirage || [],
-    normal_resets_at: stock.normal_resets_at || null,
-    mirage_resets_at: stock.mirage_resets_at || null
-  };
+  cachedStock = stock;
 
-  cachedMythicals = (mythical.fruits || []).map((fruit) =>
-    fruit.name
-  );
+  fruitsInfo = fruits.fruits || fruits || [];
 
   lastUpdate = new Date().toISOString();
 
   return cachedStock;
 }
 
+function adicionarRaridade(fruta) {
+  const info = fruitsInfo.find(
+    (item) =>
+      item.name?.toLowerCase() ===
+      fruta.name?.toLowerCase()
+  );
+
+  let rarity = null;
+
+  if (info) {
+    rarity =
+      info.rarity ||
+      info.Rarity ||
+      null;
+  }
+
+  return {
+    ...fruta,
+    rarity,
+    mythical:
+      rarity?.toLowerCase() === "mythical"
+  };
+}
+
 app.get("/", (req, res) => {
   res.json({
     name: "Blox Stock API",
     status: "online",
-    version: "2.0.0"
+    version: "3.0.0"
   });
 });
 
@@ -84,23 +103,21 @@ app.get("/api/stock", async (req, res) => {
       await updateStock();
     }
 
-    const normal = cachedStock.normal.map((fruit) => ({
-      ...fruit,
-      mythical: cachedMythicals.includes(fruit.name)
-    }));
+    const normal = (cachedStock.normal || [])
+      .map(adicionarRaridade);
 
-    const mirage = cachedStock.mirage.map((fruit) => ({
-      ...fruit,
-      mythical: cachedMythicals.includes(fruit.name)
-    }));
+    const mirage = (cachedStock.mirage || [])
+      .map(adicionarRaridade);
 
     res.json({
       success: true,
       normal,
       mirage,
       updatedAt: lastUpdate,
-      normalResetsAt: cachedStock.normal_resets_at,
-      mirageResetsAt: cachedStock.mirage_resets_at
+      normalResetsAt:
+        cachedStock.normal_resets_at || null,
+      mirageResetsAt:
+        cachedStock.mirage_resets_at || null
     });
   } catch (error) {
     console.error(error);
@@ -113,5 +130,7 @@ app.get("/api/stock", async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Blox Stock API rodando na porta ${PORT}`);
+  console.log(
+    `Blox Stock API rodando na porta ${PORT}`
+  );
 });
